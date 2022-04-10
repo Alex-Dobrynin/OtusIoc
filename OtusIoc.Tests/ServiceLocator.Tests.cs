@@ -23,6 +23,16 @@ namespace OtusIoc.Tests
         }
 
         [Fact]
+        public void ServiceLocator_ShouldThrowException_WhenThereIsNoRegisteredKey()
+        {
+            var locator = ServiceLocator.Instance;
+
+            var result = () => locator.Resolve<ICommand>("some_key");
+
+            result.Should().Throw<InvalidOperationException>();
+        }
+
+        [Fact]
         public void ServiceLocator_ShouldResolve_RegisteredDelegate()
         {
             var locator = ServiceLocator.Instance;
