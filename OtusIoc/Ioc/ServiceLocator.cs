@@ -24,6 +24,11 @@ namespace OtusIoc.Ioc
 
         private ServiceLocator()
         {
+            Scopes.Value = new RootScope(this);
+
+            _handlers.Add(typeof(Type), TypeHandle);
+            _handlers.Add(typeof(Delegate), DelegateHandle);
+            _handlers.Add(typeof(object), ObjectHandle);
         }
 
         public static IServiceLocator Instance => _instance;
@@ -39,28 +44,16 @@ namespace OtusIoc.Ioc
 
         public IScope GetCurrentScope() => Scopes.Value;
 
-        // Scopes will grow with new threads
-        // and there is no way to clean not used scopes
-        // because we don't know when thread is done
-        // and this will cause a memory leak
         public ThreadLocal<IScope> Scopes { get; } = new ThreadLocal<IScope>();
 
-        private ScopeBase InitScope()
+        private ScopeBase CheckScope()
         {
-            ScopeBase scope;
-            if (Scopes.IsValueCreated) scope = Scopes.Value as ScopeBase;
-            else
-            {
-                scope = new RootScope(this);
-                Scopes.Value = scope;
-            }
-
-            return scope;
+            return (Scopes.Value as ScopeBase) ?? throw new NullReferenceException("Scope for this thread is not initialized");
         }
 
         public T Resolve<T>(string key, params object[] args)
         {
-            var scope = InitScope();
+            var scope = CheckScope();
 
             var value = scope.Resolve(key);
 
@@ -69,12 +62,25 @@ namespace OtusIoc.Ioc
 
         private object HandleReslove(object value, params object[] args)
         {
-            return value switch
+            Delegate handler = null;
+
+            foreach (var kvpHandler in _handlers)
             {
-                Delegate buildFunc => DelegateHandle(buildFunc, args),
-                Type type => TypeHandle(type, args),
-                _ => value
-            };
+                if (kvpHandler.Key.IsAssignableFrom(value.GetType()))
+                {
+                    handler = kvpHandler.Value;
+                    break;
+                }
+            }
+
+            return handler?.DynamicInvoke(value, args) ?? throw new ArgumentException();
+        }
+
+        private Dictionary<Type, Delegate> _handlers = new();
+
+        private object ObjectHandle(object value, params object[] args)
+        {
+            return value;
         }
 
         private object TypeHandle(Type type, params object[] args)

@@ -138,7 +138,7 @@ namespace OtusIoc.Tests
         }
 
         [Fact]
-        public void ServiceLocator_ShouldUseDifferentScopes_ForDifferentThreads_WhenMultiThreading()
+        public void ServiceLocator_ShouldThrowException_ForDifferentThreads_WhenScopeIsNotInitialized()
         {
             var locator = ServiceLocator.Instance;
             IScope anotherThreadScope = null;
@@ -150,6 +150,69 @@ namespace OtusIoc.Tests
             {
                 try
                 {
+                    anotherThreadScope = locator.Resolve<IScope>(StringConstants.CurrentScope);
+                }
+                catch (Exception ex)
+                {
+                    exception = ex;
+                }
+            });
+            thread.Start();
+            thread.Join();
+
+            exception.Should().NotBeNull();
+        }
+
+        [Fact]
+        public void ServiceLocator_ShouldUseTheSameScope_ForDifferentThreads_WhenMultiThreading()
+        {
+            var locator = ServiceLocator.Instance;
+            IScope anotherThreadScope = null;
+            Exception exception = null;
+
+            var mainThreadScope = locator.Resolve<IScope>(StringConstants.CurrentScope);
+            var setScopeCommand = locator.Resolve<ICommand>(StringConstants.SetCurrentScope, mainThreadScope);
+
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    setScopeCommand.Execute();
+
+                    anotherThreadScope = locator.Resolve<IScope>(StringConstants.CurrentScope);
+                }
+                catch (Exception ex)
+                {
+                    exception = ex;
+                }
+            });
+            thread.Start();
+            thread.Join();
+
+            exception.Should().BeNull();
+            anotherThreadScope.Should().NotBeNull().And.Be(mainThreadScope);
+        }
+
+        [Fact]
+        public void ServiceLocator_ShouldUseDifferentScopes_ForDifferentThreads_WhenMultiThreading()
+        {
+            var locator = ServiceLocator.Instance;
+            IScope anotherThreadScope = null;
+            Exception exception = null;
+
+            var mainThreadScope = locator.Resolve<IScope>(StringConstants.CurrentScope);
+            var setScopeCommand = locator.Resolve<ICommand>(StringConstants.SetCurrentScope, mainThreadScope);
+
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    setScopeCommand.Execute();
+
+                    var s = locator.Resolve<IScope>(StringConstants.CurrentScope);
+
+                    locator.Resolve<IScope>(StringConstants.CreateNewScope, s);
+
                     anotherThreadScope = locator.Resolve<IScope>(StringConstants.CurrentScope);
                 }
                 catch (Exception ex)

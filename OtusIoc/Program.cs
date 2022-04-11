@@ -27,8 +27,12 @@ using (var newSDisp = locator.Resolve<IScope>(StringConstants.CreateNewScope, s)
     }
 }
 
+var setScopeCommand = locator.Resolve<ICommand>(StringConstants.SetCurrentScope, s);
+
 var thread = new Thread(() =>
 {
+    setScopeCommand.Execute();
+
     locator.Resolve<ICommand>(StringConstants.IocRegister, "aaa", () => 4).Execute();
     var d = locator.Resolve<int>("aaa");
 
